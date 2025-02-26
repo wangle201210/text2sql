@@ -10,6 +10,14 @@ import (
 )
 
 func createOpenAIChatModel(ctx context.Context) model.ChatModel {
+	m := os.Getenv("OPENAI_MODEL_NAME")
+	if m == "" {
+		log.Fatalf("请在环境变量中设置你的 OPENAI_MODEL_NAME")
+	}
+	apikey := os.Getenv("OPENAI_API_KEY")
+	if apikey == "" {
+		log.Fatalf("请在环境变量中设置你的 OPENAI_API_KEY")
+	}
 	chatModel, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
 		Model:   os.Getenv("OPENAI_MODEL_NAME"),
 		APIKey:  os.Getenv("OPENAI_API_KEY"),

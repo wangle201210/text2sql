@@ -19,6 +19,10 @@ go get github.com/wangle201210/text2sql
 
 ### 基本用法
 
+export OPENAI_API_KEY="sk-******"
+export OPENAI_MODEL_NAME="gpt-4o-mini"
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+
 ```go
 package main
 
