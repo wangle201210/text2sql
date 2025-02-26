@@ -8,10 +8,6 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-const (
-	UnrelatedQuestion = "不相关的问题，请重新提问"
-)
-
 func createTemplate() prompt.ChatTemplate {
 	// 创建模板，使用 FString 格式
 	return prompt.FromMessages(schema.FString,
@@ -28,13 +24,10 @@ func createTemplate() prompt.ChatTemplate {
 			"Also, pay attention to which column is in which table."+
 			"Pay attention to use CURDATE() function to get the current date, if the question involves \"today\"."+
 			"Can only perform queries and does not accept any modification or deletion functions."+
-			"Use the following table schema info to create your SQL query:\n{ddl}"+
-			"返回内容只能包含SQL语句，不包含解释及其他信息也不要加上sql标签。",
-		// "通过分析用户的提问与数据库表结构之间的关系，生成相应的SQL查询语句。如果提问的内容与现有的数据库表结构没有任何关联，返回：\"{unrelated}\"。",
+			"Use the following table schema info to create your SQL query:\n{ddl}\n"+
+			"The returned content can only contain SQL statements, without explanations or other information, and should not be labeled with SQL tags.",
 		),
-		// 插入需要的对话历史（新对话的话这里不填）
 		schema.MessagesPlaceholder("chat_history", true),
-
 		// 用户消息模板
 		schema.UserMessage("Question: {question}"),
 	)
@@ -44,8 +37,7 @@ func createMessagesFromTemplate(ddl, question string) []*schema.Message {
 	template := createTemplate()
 	// 使用模板生成消息
 	messages, err := template.Format(context.Background(), map[string]any{
-		"role": "You are a MySQL expert.",
-		// "unrelated":    UnrelatedQuestion,
+		"role":         "You are a MySQL expert.",
 		"question":     question,
 		"ddl":          ddl,
 		"limit":        10,

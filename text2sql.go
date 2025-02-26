@@ -1,9 +1,7 @@
 package text2sql
 
 import (
-	"errors"
 	"log"
-	"strings"
 
 	"github.com/wangle201210/text2sql/eino"
 	"github.com/wangle201210/text2sql/mysql"
@@ -24,10 +22,6 @@ func (x *Text2sql) Do(question string) (sql string, runResult map[string]interfa
 	}
 	ddl := db.GetDdl()
 	sql = eino.GetSQL(ddl, question)
-	if strings.HasPrefix(sql, eino.UnrelatedQuestion) {
-		err = errors.New(sql)
-		return
-	}
 	err = db.CheckSQL(sql)
 	try := x.Try
 	for err != nil && try > 0 {
