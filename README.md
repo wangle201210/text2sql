@@ -53,6 +53,9 @@ func main() {
     - 设置为`true`时会执行SQL并返回结果
     - 设置为`false`时只返回生成的SQL语句
 
+## 命令行工具
+[命令行工具](./cmd/text2sql/README.md)
+![效果图](./img.png)
 
 ## 注意事项
 
