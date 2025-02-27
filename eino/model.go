@@ -2,6 +2,7 @@ package eino
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -9,22 +10,34 @@ import (
 	"github.com/cloudwego/eino/components/model"
 )
 
-func createOpenAIChatModel(ctx context.Context) model.ChatModel {
-	m := os.Getenv("OPENAI_MODEL_NAME")
-	if m == "" {
-		log.Fatalf("请在环境变量中设置你的 OPENAI_MODEL_NAME")
+// createOpenAIChatModel 创建OpenAI聊天模型实例
+func createOpenAIChatModel(ctx context.Context) (model.ChatModel, error) {
+	// 验证必需的环境变量
+	modelName := os.Getenv("OPENAI_MODEL_NAME")
+	if modelName == "" {
+		return nil, fmt.Errorf("环境变量OPENAI_MODEL_NAME未设置")
 	}
-	apikey := os.Getenv("OPENAI_API_KEY")
-	if apikey == "" {
-		log.Fatalf("请在环境变量中设置你的 OPENAI_API_KEY")
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("环境变量OPENAI_API_KEY未设置")
 	}
+
+	// 获取可选的baseURL
+	baseURL := os.Getenv("OPENAI_BASE_URL")
+	if baseURL == "" {
+		log.Println("未设置OPENAI_BASE_URL，将使用默认API地址")
+	}
+
+	// 创建聊天模型
 	chatModel, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
-		Model:   os.Getenv("OPENAI_MODEL_NAME"),
-		APIKey:  os.Getenv("OPENAI_API_KEY"),
-		BaseURL: os.Getenv("OPENAI_BASE_URL"),
+		Model:   modelName,
+		APIKey:  apiKey,
+		BaseURL: baseURL,
 	})
 	if err != nil {
-		log.Fatalf("create openai chat model failed, err=%v", err)
+		return nil, fmt.Errorf("创建OpenAI聊天模型失败: %w", err)
 	}
-	return chatModel
+
+	return chatModel, nil
 }
