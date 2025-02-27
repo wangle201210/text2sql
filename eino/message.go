@@ -2,12 +2,18 @@ package eino
 
 import (
 	"context"
-	"log"
+	"fmt"
 
 	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/schema"
 )
 
+const (
+	limit = 1000
+	role  = "You are a MySQL expert."
+)
+
+// createTemplate 创建并返回一个配置好的聊天模板
 func createTemplate() prompt.ChatTemplate {
 	// 创建模板，使用 FString 格式
 	return prompt.FromMessages(schema.FString,
@@ -33,18 +39,48 @@ func createTemplate() prompt.ChatTemplate {
 	)
 }
 
-func createMessagesFromTemplate(ddl, question string) []*schema.Message {
+// formatMessages 格式化消息并处理错误
+func formatMessages(template prompt.ChatTemplate, data map[string]any) ([]*schema.Message, error) {
+	messages, err := template.Format(context.Background(), data)
+	if err != nil {
+		return nil, fmt.Errorf("格式化模板失败: %w", err)
+	}
+	return messages, nil
+}
+
+// ddl2sqlMessages 将DDL和问题转换为消息列表
+func ddl2sqlMessages(ddl, question string) ([]*schema.Message, error) {
 	template := createTemplate()
-	// 使用模板生成消息
-	messages, err := template.Format(context.Background(), map[string]any{
-		"role":         "You are a MySQL expert.",
+	data := map[string]any{
+		"role":         role,
 		"question":     question,
 		"ddl":          ddl,
-		"limit":        10,
+		"limit":        limit,
 		"chat_history": []*schema.Message{},
-	})
-	if err != nil {
-		log.Fatalf("format template failed: %v\n", err)
 	}
-	return messages
+	messages, err := formatMessages(template, data)
+	if err != nil {
+		return nil, err
+	}
+	return messages, nil
+}
+
+// choiceSqlMessages 生成SQL选择消息列表
+func choiceSqlMessages(sqls, ddl, question string) ([]*schema.Message, error) {
+	template := createTemplate()
+	data := map[string]any{
+		"role":     role,
+		"question": "Select the most suitable SQL output from the above SQL statements",
+		"ddl":      ddl,
+		"limit":    limit,
+		"chat_history": []*schema.Message{
+			schema.UserMessage(question),
+			schema.AssistantMessage(sqls, nil),
+		},
+	}
+	messages, err := formatMessages(template, data)
+	if err != nil {
+		return nil, err
+	}
+	return messages, nil
 }
