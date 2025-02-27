@@ -38,6 +38,7 @@ func main() {
         DbLink:    "root:password@tcp(127.0.0.1:3306)/database?charset=utf8mb4&parseTime=True&loc=Local",
         Try:       5,      // 失败时的重试次数
         ShouldRun: true,   // 是否执行生成的SQL
+        Times:     3,      // 同时生成3个SQL，选择最合适的一个
     }
     
     // 将中文问题转换为SQL并执行
@@ -58,6 +59,10 @@ func main() {
 - `ShouldRun`: 是否执行生成的SQL语句
     - 设置为`true`时会执行SQL并返回结果
     - 设置为`false`时只返回生成的SQL语句
+- `Times`: 同时生成SQL的次数（可选，默认1）
+    - 取值范围：1-10
+    - 数值越大，生成的SQL候选数越多，选择最合适的SQL的准确率越高
+    - 注意：数值越大消耗的token也越多
 
 ## 命令行工具
 [命令行工具](./cmd/text2sql/README.md)

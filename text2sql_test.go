@@ -7,6 +7,7 @@ func TestText2sql(t *testing.T) {
 		DbLink:    "root:@tcp(127.0.0.1:3306)/note?charset=utf8mb4&parseTime=True&loc=Local",
 		Try:       5,
 		ShouldRun: true,
+		Times:     2,
 	}
 	sql, res, err := data.Do("王五在2025年1月上旬的餐饮食品类别总额")
 	if err != nil {

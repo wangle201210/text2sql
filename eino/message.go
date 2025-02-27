@@ -8,6 +8,11 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
+const (
+	limit = 1000
+	role  = "You are a MySQL expert."
+)
+
 func createTemplate() prompt.ChatTemplate {
 	// 创建模板，使用 FString 格式
 	return prompt.FromMessages(schema.FString,
@@ -33,15 +38,34 @@ func createTemplate() prompt.ChatTemplate {
 	)
 }
 
-func createMessagesFromTemplate(ddl, question string) []*schema.Message {
+func ddl2sqlMessages(ddl, question string) []*schema.Message {
 	template := createTemplate()
 	// 使用模板生成消息
 	messages, err := template.Format(context.Background(), map[string]any{
-		"role":         "You are a MySQL expert.",
+		"role":         role,
 		"question":     question,
 		"ddl":          ddl,
-		"limit":        10,
+		"limit":        limit,
 		"chat_history": []*schema.Message{},
+	})
+	if err != nil {
+		log.Fatalf("format template failed: %v\n", err)
+	}
+	return messages
+}
+
+func choiceSqlMessages(sqls, ddl, question string) []*schema.Message {
+	template := createTemplate()
+	// 使用模板生成消息
+	messages, err := template.Format(context.Background(), map[string]any{
+		"role":     role,
+		"question": "Select the most suitable SQL output from the above SQL statements",
+		"ddl":      ddl,
+		"limit":    limit,
+		"chat_history": []*schema.Message{
+			schema.UserMessage(question),
+			schema.AssistantMessage(sqls, nil),
+		},
 	})
 	if err != nil {
 		log.Fatalf("format template failed: %v\n", err)
