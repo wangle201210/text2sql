@@ -2,7 +2,7 @@ module github.com/wangle201210/text2sql/cmd/text2sql
 
 go 1.23.1
 
-require github.com/wangle201210/text2sql v0.0.0-20250226085626-099821de6c13
+require github.com/wangle201210/text2sql v0.0.0-20250227070036-722d48a0f6f1
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
