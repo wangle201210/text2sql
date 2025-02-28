@@ -42,6 +42,6 @@ func main() {
 	}
 	fmt.Printf("sql: %s \n", sql)
 	if run {
-		fmt.Printf("result: %s \n", result)
+		fmt.Printf("result: %+v \n", result)
 	}
 }

@@ -27,7 +27,7 @@ type Text2sql struct {
 }
 
 // Do 执行文本到SQL的转换过程
-func (x *Text2sql) Do(question string) (sql string, runResult map[string]interface{}, err error) {
+func (x *Text2sql) Do(question string) (sql string, runResult []map[string]interface{}, err error) {
 	// 参数验证和初始化
 	if question == "" {
 		return "", nil, errors.New("问题不能为空")

@@ -59,7 +59,7 @@ func (x *Db) getDdl() ([]string, error) {
 	ddls := make([]string, 0, len(list))
 	for _, tableName := range list {
 		result := map[string]interface{}{}
-		if err := x.db.Raw(fmt.Sprintf("SHOW CREATE TABLE %s", tableName)).Scan(&result).Error; err != nil {
+		if err := x.db.Raw(fmt.Sprintf("SHOW CREATE TABLE `%s`", tableName)).Scan(&result).Error; err != nil {
 			return nil, fmt.Errorf("获取表%s的结构失败: %w", tableName, err)
 		}
 
@@ -101,7 +101,7 @@ func (x *Db) CheckSQL(sql string) error {
 }
 
 // DoSQL 执行SQL查询并返回结果
-func (x *Db) DoSQL(sql string) (res map[string]interface{}, err error) {
+func (x *Db) DoSQL(sql string) (res []map[string]interface{}, err error) {
 	// 创建只读事务
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -117,7 +117,7 @@ func (x *Db) DoSQL(sql string) (res map[string]interface{}, err error) {
 	tx.Set("gorm:query_option", "FOR READ ONLY")
 
 	// 执行查询
-	res = map[string]interface{}{}
+	res = []map[string]interface{}{}
 	if err = tx.Raw(sql).Scan(&res).Error; err != nil {
 		tx.Rollback()
 		return
