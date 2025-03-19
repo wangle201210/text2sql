@@ -39,10 +39,12 @@ func main() {
         Try:       5,      // 失败时的重试次数
         ShouldRun: true,   // 是否执行生成的SQL
         Times:     3,      // 同时生成3个SQL，选择最合适的一个
+		OnlyView: true,    // 只查询view结构，使用view提高查询效果
     }
     
     // 将中文问题转换为SQL并执行
-    sql, result, err := client.Do("王五的openid")
+    // sql, result, err := client.Do("王五的openid")
+    sql, result, err := client.Pretty("王五的openid") // 返回结果可读性更佳
     if err != nil {
         panic(err)
     }
@@ -63,6 +65,9 @@ func main() {
     - 取值范围：1-10
     - 数值越大，生成的SQL候选数越多，选择最合适的SQL的准确率越高
     - 注意：数值越大消耗的token也越多
+- `OnlyView`: 只使用view结构，使用view提高查询效果
+- `OnlyTable`: 只使用table结构，不加载view
+
 
 ## 命令行工具
 [命令行工具](./cmd/text2sql/README.md)
