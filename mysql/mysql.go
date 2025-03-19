@@ -19,6 +19,9 @@ type Db struct {
 	DataSourceName string   // 数据库连接字信息
 	db             *gorm.DB // gorm数据库实例
 	ddl            []string // 数据库表结构定义列表
+
+	OnlyView  bool // 是否只使用 视图
+	OnlyTable bool // 是否只使用 表
 }
 
 // Init 初始化数据库连接并获取表结构
@@ -62,12 +65,37 @@ func (x *Db) getDdl() ([]string, error) {
 		if err := x.db.Raw(fmt.Sprintf("SHOW CREATE TABLE `%s`", tableName)).Scan(&result).Error; err != nil {
 			return nil, fmt.Errorf("获取表%s的结构失败: %w", tableName, err)
 		}
-
-		createTable, ok := result["Create Table"].(string)
-		if !ok {
-			return nil, fmt.Errorf("表%s的结构格式异常", tableName)
+		if d, e := result["Create Table"]; e {
+			if x.OnlyView {
+				continue
+			}
+			createTable := d.(string)
+			ddls = append(ddls, createTable)
+			continue
 		}
-		ddls = append(ddls, createTable)
+		if v, e := result["View"]; e {
+			if x.OnlyTable {
+				continue
+			}
+			var columns []ColumnMeta
+			// 其实table也可以这样使用
+			if err := x.db.Raw(fmt.Sprintf("SHOW FULL COLUMNS FROM %s", v)).Scan(&columns).Error; err != nil {
+				return nil, fmt.Errorf("获取表%s的结构失败: %w", tableName, err)
+			}
+			createTable := fmt.Sprintf("CREATE VIEW `%s` (", v)
+			for _, column := range columns {
+				createTable += fmt.Sprintf("\n`%s` %s", column.Field, column.Type)
+				if column.Comment != "" {
+					createTable += fmt.Sprintf(" COMMENT '%s'", column.Comment)
+				}
+				createTable += ","
+			}
+			createTable = createTable[:len(createTable)-1]
+			createTable += ")"
+			ddls = append(ddls, createTable)
+			continue
+		}
+		return nil, fmt.Errorf("获取表%s的结构失败: %w", tableName, err)
 	}
 	return ddls, nil
 }

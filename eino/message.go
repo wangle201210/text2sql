@@ -31,6 +31,9 @@ func createTemplate() prompt.ChatTemplate {
 			"Pay attention to use CURDATE() function to get the current date, if the question involves \"today\"."+
 			"Can only perform queries and does not accept any modification or deletion functions."+
 			"Use the following table schema info to create your SQL query:\n{ddl}\n"+
+			"I have simplified the syntax of view to be similar to table syntax."+
+			"If the view can meet the needs, use the view first, otherwise use the table"+
+			"Think about it step by step:\n1. Determine the tables to be joined...\n2. Identify the filter conditions...\n3. Choose the aggregation method..."+
 			"The returned content can only contain SQL statements, without explanations or other information, and should not be labeled with SQL tags.",
 		),
 		schema.MessagesPlaceholder("chat_history", true),
@@ -77,6 +80,39 @@ func choiceSqlMessages(sqls, ddl, question string) ([]*schema.Message, error) {
 			schema.UserMessage(question),
 			schema.AssistantMessage(sqls, nil),
 		},
+	}
+	messages, err := formatMessages(template, data)
+	if err != nil {
+		return nil, err
+	}
+	return messages, nil
+}
+
+// createAnswerTemplate 创建并返回一个配置好的聊天模板
+func createAnswerTemplate() prompt.ChatTemplate {
+	// 创建模板，使用 FString 格式
+	return prompt.FromMessages(schema.FString,
+		// 系统消息模板
+		schema.SystemMessage("{role}"+
+			"Given an input question, first create a syntactically correct MySQL query to run, then look at the results of the query and return the answer to the input question."+
+			"The SQL statement obtained is: {sql}。 "+
+			"The result obtained after executing SQL is: {result}。"+
+			"Answer user questions based on the executed SQL and the obtained answers.",
+		),
+		schema.MessagesPlaceholder("chat_history", true),
+		// 用户消息模板
+		schema.UserMessage("Question: {question}"),
+	)
+}
+
+// prettyMessages 优化回答
+func prettyMessages(question, sql, answer string) ([]*schema.Message, error) {
+	template := createAnswerTemplate()
+	data := map[string]any{
+		"role":     role,
+		"question": question,
+		"sql":      sql,
+		"result":   answer,
 	}
 	messages, err := formatMessages(template, data)
 	if err != nil {

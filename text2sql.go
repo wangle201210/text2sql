@@ -24,6 +24,25 @@ type Text2sql struct {
 	question   string    // 用户输入的问题
 	sqls       []string  // 生成的SQL列表
 	removeSqls []string  // 去除空白后的SQL列表
+
+	OnlyView  bool // 是否只使用 视图
+	OnlyTable bool // 是否只使用 表
+}
+
+func (x *Text2sql) Pretty(question string) (sql string, runResult string, err error) {
+	var res []map[string]interface{}
+	sql, res, err = x.Do(question)
+	if len(res) == 0 {
+		runResult = ""
+		return
+	}
+	// 优化回答
+	runResult, err = eino.PrettyRes(sql, question, res)
+	if err != nil {
+		err = fmt.Errorf("优化回答失败: %w", err)
+		return
+	}
+	return
 }
 
 // Do 执行文本到SQL的转换过程
@@ -48,7 +67,7 @@ func (x *Text2sql) Do(question string) (sql string, runResult []map[string]inter
 	}
 
 	// 初始化数据库连接
-	db := &mysql.Db{DataSourceName: x.DbLink}
+	db := &mysql.Db{DataSourceName: x.DbLink, OnlyView: x.OnlyView, OnlyTable: x.OnlyTable}
 	if err = db.Init(); err != nil {
 		err = fmt.Errorf("初始化数据库失败: %w", err)
 		return
