@@ -39,7 +39,7 @@ func main() {
         Try:       5,      // 失败时的重试次数
         ShouldRun: true,   // 是否执行生成的SQL
         Times:     3,      // 同时生成3个SQL，选择最合适的一个
-		OnlyView: true,    // 只查询view结构，使用view提高查询效果
+	// OnlyView: true,    // 只查询view结构，使用view提高查询效果
     }
     
     // 将中文问题转换为SQL并执行
