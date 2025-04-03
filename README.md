@@ -19,12 +19,6 @@ go get github.com/wangle201210/text2sql
 
 ### 基本用法
 
-```bash
-export OPENAI_API_KEY="sk-******"
-export OPENAI_MODEL_NAME="gpt-4o-mini"
-export OPENAI_BASE_URL="https://api.openai.com/v1"
-```
-
 ```go
 package main
 
@@ -34,23 +28,31 @@ import (
 )
 
 func main() {
-    client := &text2sql.Text2sql{
-        DbLink:    "root:password@tcp(127.0.0.1:3306)/database?charset=utf8mb4&parseTime=True&loc=Local",
-        Try:       5,      // 失败时的重试次数
-        ShouldRun: true,   // 是否执行生成的SQL
-        Times:     3,      // 同时生成3个SQL，选择最合适的一个
-	// OnlyView: true,    // 只查询view结构，使用view提高查询效果
-    }
-    
-    // 将中文问题转换为SQL并执行
-    // sql, result, err := client.Do("王五的openid")
-    sql, result, err := client.Pretty("王五的openid") // 返回结果可读性更佳
-    if err != nil {
-        panic(err)
-    }
-    
-    fmt.Printf("生成的SQL: %s\n", sql)
-    fmt.Printf("执行结果: %v\n", result)
+  cfg := &text2sql.Config{
+    DbLink:    "root:password@tcp(127.0.0.1:3306)/database?charset=utf8mb4&parseTime=True&loc=Local",
+    Try:       5,      // 失败时的重试次数
+    ShouldRun: true,   // 是否执行生成的SQL
+    Times:     3,      // 同时生成3个SQL，选择最合适的一个
+    // OnlyView: true,    // 只查询view结构，使用view提高查询效果
+  }
+  newEino, err := eino.NewEino(&openai.ChatModelConfig{
+    APIKey:  os.Getenv("OPENAI_API_KEY"), // sk-******
+    BaseURL: os.Getenv("OPENAI_BASE_URL"), // https://api.openai.com/v1
+    Model:   os.Getenv("OPENAI_MODEL_NAME"), // gpt-4o-mini
+  })
+  if err != nil {
+    log.Fatalf("NewEino err: %+v", err)
+    return
+  }
+  ts := text2sql.NewText2sql(cfg, newEino)
+  sql, result, err := ts.Pretty("王五在2025年1月上旬的餐饮食品类别总额")
+  if err != nil {
+    log.Fatalf("text2sql err: %+v", err)
+  }
+  fmt.Printf("sql: %s \n", sql)
+  if run {
+    fmt.Printf("result: %+v \n", result)
+  }
 }
 ```
 

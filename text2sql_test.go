@@ -11,7 +11,7 @@ import (
 
 func TestText2sql(t *testing.T) {
 	cfg := &Config{
-		DbLink:    "root:123456@tcp(127.0.0.1:3306)/note?charset=utf8mb4&parseTime=True&loc=Local",
+		DbLink:    "root:123456@tcp(127.0.0.1:3306)/note",
 		Try:       5,
 		ShouldRun: true,
 		Times:     2,
