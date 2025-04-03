@@ -5,20 +5,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/cloudwego/eino-ext/components/model/openai"
+	"github.com/cloudwego/eino/components/model"
 )
 
-func GetSQL(ddl, question string) (sql string, err error) {
+type Eino struct {
+	cm model.ChatModel
+}
+
+func NewEino(cfg *openai.ChatModelConfig) (res *Eino, err error) {
+	chatModel, err := openai.NewChatModel(context.Background(), cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &Eino{cm: chatModel}, nil
+}
+
+func (x *Eino) GetSQL(ddl, question string) (sql string, err error) {
 	ctx := context.Background()
 	messages, err := ddl2sqlMessages(ddl, question)
 	if err != nil {
 		return "", err
 	}
-
-	cm, err := createOpenAIChatModel(ctx)
-	if err != nil {
-		return "", err
-	}
-	result, err := generate(ctx, cm, messages)
+	result, err := generate(ctx, x.cm, messages)
 	if err != nil {
 		return "", fmt.Errorf("生成SQL失败: %w", err)
 	}
@@ -26,18 +36,14 @@ func GetSQL(ddl, question string) (sql string, err error) {
 	return trimSql(sql), nil
 }
 
-func ChoiceSQL(sqls, ddl, question string) (sql string, err error) {
+func (x *Eino) ChoiceSQL(sqls, ddl, question string) (sql string, err error) {
 	ctx := context.Background()
 	messages, err := choiceSqlMessages(sqls, ddl, question)
 	if err != nil {
 		return "", err
 	}
 
-	cm, err := createOpenAIChatModel(ctx)
-	if err != nil {
-		return "", err
-	}
-	result, err := generate(ctx, cm, messages)
+	result, err := generate(ctx, x.cm, messages)
 	if err != nil {
 		return "", fmt.Errorf("选择SQL失败: %w", err)
 	}
@@ -45,8 +51,7 @@ func ChoiceSQL(sqls, ddl, question string) (sql string, err error) {
 	return trimSql(sql), nil
 }
 
-func PrettyRes(sql, question string, runResult []map[string]interface{}) (res string, err error) {
-	ctx := context.Background()
+func (x *Eino) PrettyRes(sql, question string, runResult []map[string]interface{}) (res string, err error) {
 	marshal, err := json.Marshal(runResult)
 	if err != nil {
 		return "", err
@@ -56,11 +61,7 @@ func PrettyRes(sql, question string, runResult []map[string]interface{}) (res st
 		return "", err
 	}
 
-	cm, err := createOpenAIChatModel(ctx)
-	if err != nil {
-		return "", err
-	}
-	result, err := generate(ctx, cm, messages)
+	result, err := generate(context.Background(), x.cm, messages)
 	if err != nil {
 		return "", fmt.Errorf("优化回答失败: %w", err)
 	}

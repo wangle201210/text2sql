@@ -13,20 +13,37 @@ import (
 	"github.com/wangle201210/text2sql/mysql"
 )
 
-// Text2SQL 结构体定义了文本到SQL转换的核心配置和状态
+// Text2sql 结构体定义了文本到SQL转换的核心配置和状态
 type Text2sql struct {
-	DbLink     string    // 数据库连接字符串
-	Try        int       // 单次生成失败后的重试次数
-	ShouldRun  bool      // 是否执行生成的SQL
-	Times      int       // 并发生成SQL的次数（1-10）
-	db         *mysql.Db // 数据库连接实例
-	ddl        string    // 数据库表结构
-	question   string    // 用户输入的问题
-	sqls       []string  // 生成的SQL列表
-	removeSqls []string  // 去除空白后的SQL列表
+	Config
+	eino *eino.Eino
+	db   *mysql.Db // 数据库连接实例
+	ddl  string    // 数据库表结构
+}
 
-	OnlyView  bool // 是否只使用 视图
-	OnlyTable bool // 是否只使用 表
+type Config struct {
+	DbLink    string // 数据库连接字符串
+	Try       int    // 单次生成失败后的重试次数
+	ShouldRun bool   // 是否执行生成的SQL
+	Times     int    // 并发生成SQL的次数（1-10）
+	OnlyView  bool   // 是否只使用 视图
+	OnlyTable bool   // 是否只使用 表
+}
+
+func NewText2sql(conf *Config, eino *eino.Eino) *Text2sql {
+	if conf.Try == 0 {
+		conf.Try = 1
+	}
+	// 规范化Times参数
+	if conf.Times <= 0 {
+		conf.Times = 1 // 至少运行一次
+	} else if conf.Times > 10 {
+		conf.Times = 10 // 最多10次
+	}
+	return &Text2sql{
+		Config: *conf,
+		eino:   eino,
+	}
 }
 
 func (x *Text2sql) Pretty(question string) (sql string, runResult string, err error) {
@@ -37,7 +54,7 @@ func (x *Text2sql) Pretty(question string) (sql string, runResult string, err er
 		return
 	}
 	// 优化回答
-	runResult, err = eino.PrettyRes(sql, question, res)
+	runResult, err = x.eino.PrettyRes(sql, question, res)
 	if err != nil {
 		err = fmt.Errorf("优化回答失败: %w", err)
 		return
@@ -51,46 +68,35 @@ func (x *Text2sql) Do(question string) (sql string, runResult []map[string]inter
 	if question == "" {
 		return "", nil, errors.New("问题不能为空")
 	}
-	if x.DbLink == "" {
-		return "", nil, errors.New("数据库连接信息不能为空")
+	if x.db == nil {
+		if x.DbLink == "" {
+			return "", nil, errors.New("数据库连接信息不能为空")
+		}
+		// 初始化数据库连接
+		db := &mysql.Db{DataSourceName: x.DbLink, OnlyView: x.OnlyView, OnlyTable: x.OnlyTable}
+		if err = db.Init(); err != nil {
+			err = fmt.Errorf("初始化数据库失败: %w", err)
+			return
+		}
+		x.db = db
+		x.ddl = db.GetDdl()
 	}
-
-	if x.Try == 0 {
-		x.Try = 1
-	}
-
-	// 规范化Times参数
-	if x.Times <= 0 {
-		x.Times = 1 // 至少运行一次
-	} else if x.Times > 10 {
-		x.Times = 10 // 最多10次
-	}
-
-	// 初始化数据库连接
-	db := &mysql.Db{DataSourceName: x.DbLink, OnlyView: x.OnlyView, OnlyTable: x.OnlyTable}
-	if err = db.Init(); err != nil {
-		err = fmt.Errorf("初始化数据库失败: %w", err)
-		return
-	}
-	x.db = db
-	x.ddl = db.GetDdl()
-	x.question = question
-
 	// 生成SQL
-	if err = x.getAllSql(); err != nil {
+	var sqls []string
+	if sqls, err = x.getAllSql(question); err != nil {
 		err = fmt.Errorf("生成SQL失败: %w", err)
 		return
 	}
 
 	// 选择最佳SQL
-	if sql, err = x.choice(); err != nil {
+	if sql, err = x.choice(sqls, question); err != nil {
 		err = fmt.Errorf("选择SQL失败: %w", err)
 		return
 	}
 
 	// 执行SQL（如果需要）
 	if x.ShouldRun && sql != "" {
-		if runResult, err = db.DoSQL(sql); err != nil {
+		if runResult, err = x.db.DoSQL(sql); err != nil {
 			err = fmt.Errorf("sql执行失败，sql %s, err: %w", sql, err)
 			return
 		}
@@ -98,29 +104,29 @@ func (x *Text2sql) Do(question string) (sql string, runResult []map[string]inter
 	return
 }
 
-func (x *Text2sql) removeWhitespace() {
-	x.removeSqls = []string{}
-	for _, sql := range x.sqls {
-		x.removeSqls = append(x.removeSqls, removeWhitespace(sql))
+func (x *Text2sql) removeWhitespace(sqls []string) (res []string) {
+	for _, sql := range sqls {
+		res = append(res, removeWhitespace(sql))
 	}
+	return
 }
 
-func (x *Text2sql) uniqSql() {
+func (x *Text2sql) uniqSql(sqls []string) (res []string) {
 	list := map[string]int{}
-	for i, sql := range x.removeSqls {
+	for i, sql := range sqls {
 		list[sql] = i // 存下最后一次出现的角标
 	}
-	var sqls []string
-	for _, i := range list {
-		sqls = append(sqls, x.sqls[i])
+	res = []string{}
+	for s, _ := range list {
+		res = append(res, s)
 	}
-	x.sqls = sqls
+	return res
 }
 
-func (x *Text2sql) findMostCommonSql() string {
+func (x *Text2sql) findMostCommonSql(sqlsTemp []string) (idx int) {
 	// 创建一个 map 来记录每个去空白字符后的字符串出现次数
 	countMap := make(map[string]int)
-	for _, s := range x.removeSqls {
+	for _, s := range sqlsTemp {
 		countMap[s]++
 	}
 
@@ -134,44 +140,44 @@ func (x *Text2sql) findMostCommonSql() string {
 		}
 	}
 	// 数量 > 1/2就直接使用
-	if float64(maxCount) <= float64(len(x.sqls))/2 {
-		return ""
+	if float64(maxCount) <= float64(len(sqlsTemp))/2 {
+		return -1
 	}
 	// 返回该字符串在原数组中的第一个索引
-	for i, s := range x.removeSqls {
+	for i, s := range sqlsTemp {
 		if s == mostCommonString {
-			return x.sqls[i]
+			return i
 		}
 	}
-	return ""
+	return -1
 }
 
 // choice 从多个SQL中选择一个最适合的
-func (x *Text2sql) choice() (sql string, err error) {
+func (x *Text2sql) choice(sqls []string, question string) (sql string, err error) {
 	// 移除空白后进行对比
-	x.removeWhitespace()
+	sqlsTemp := x.removeWhitespace(sqls)
 	// 如果有一个sql数量超过一半就直接使用该sql
-	if commonSql := x.findMostCommonSql(); len(commonSql) > 0 {
-		return commonSql, nil
+	if idx := x.findMostCommonSql(sqlsTemp); idx > 0 {
+		return sqls[idx], nil
 	}
 	// 去重
-	x.uniqSql()
+	sqls = x.uniqSql(sqls)
 	// 如果只有一个了就直接返回
-	if len(x.sqls) == 1 {
-		return x.sqls[0], nil
+	if len(sqls) == 1 {
+		return sqls[0], nil
 	}
 
 	// 使用strings.Builder优化字符串拼接
 	var builder strings.Builder
-	for _, s := range x.sqls {
+	for _, s := range sqls {
 		builder.WriteString(s)
 		builder.WriteString("\n")
 	}
-	sqls := builder.String()
+	sqlstr := builder.String()
 
 	// 选择并验证SQL
 	for i := 0; i < x.Try; i++ {
-		sql, err = eino.ChoiceSQL(sqls, x.ddl, x.question)
+		sql, err = x.eino.ChoiceSQL(sqlstr, x.ddl, question)
 		if err != nil {
 			continue
 		}
@@ -185,7 +191,7 @@ func (x *Text2sql) choice() (sql string, err error) {
 }
 
 // getAllSql 并发生成多个SQL候选项
-func (x *Text2sql) getAllSql() (err error) {
+func (x *Text2sql) getAllSql(question string) (sqls []string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
@@ -202,7 +208,7 @@ func (x *Text2sql) getAllSql() (err error) {
 			case <-ctx.Done():
 				return
 			default:
-				if onceSql, genErr := x.once(); genErr == nil && onceSql != "" {
+				if onceSql, genErr := x.once(question); genErr == nil && onceSql != "" {
 					select {
 					case sqlChan <- onceSql:
 					case <-ctx.Done():
@@ -229,36 +235,38 @@ func (x *Text2sql) getAllSql() (err error) {
 	for {
 		select {
 		case <-done:
-			if len(x.sqls) == 0 {
-				return errors.New("未能生成有效的SQL")
+			if len(sqls) == 0 {
+				err = errors.New("未能生成有效的SQL")
+				return
 			}
-			return nil
+			return
 		case sql := <-sqlChan:
-			x.sqls = append(x.sqls, sql)
+			sqls = append(sqls, sql)
 		case err = <-errChan:
 			cancel() // 发生错误时取消所有正在进行的操作
-			return fmt.Errorf("生成SQL过程中发生错误: %w", err)
+			err = fmt.Errorf("生成SQL过程中发生错误: %w", err)
+			return
 		case <-ctx.Done():
-			return errors.New("生成SQL超时")
+			err = errors.New("生成SQL超时")
+			return
 		}
 	}
 }
 
 // once 尝试生成一个有效的SQL
-func (x *Text2sql) once() (sql string, err error) {
-	if x.ddl == "" || x.question == "" {
-		return "", errors.New("DDL或问题为空")
+func (x *Text2sql) once(question string) (sql string, err error) {
+	if x.ddl == "" {
+		return "", errors.New("没获取到表结构")
 	}
 
 	for i := 0; i < x.Try; i++ {
-		sql, err = eino.GetSQL(x.ddl, x.question)
+		sql, err = x.eino.GetSQL(x.ddl, question)
 		if sql == "" {
 			continue
 		}
 		if err = x.db.CheckSQL(sql); err == nil {
 			return sql, nil
 		}
-		// log.Printf("第%d次尝试失败: %v\n", i+1, err)
 	}
 
 	return "", fmt.Errorf("达到最大重试次数(%d)，最后一次错误: %w", x.Try, err)

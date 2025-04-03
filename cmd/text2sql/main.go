@@ -6,7 +6,9 @@ import (
 	"log"
 	"os"
 
+	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/wangle201210/text2sql"
+	"github.com/wangle201210/text2sql/eino"
 )
 
 func main() {
@@ -30,13 +32,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	ts := &text2sql.Text2sql{
+	cfg := &text2sql.Config{
 		DbLink:    link,
 		Try:       try,
 		ShouldRun: run,
 		Times:     times,
 	}
-	sql, result, err := ts.Do(question)
+	newEino, err := eino.NewEino(&openai.ChatModelConfig{
+		APIKey:  os.Getenv("OPENAI_API_KEY"),
+		BaseURL: os.Getenv("OPENAI_BASE_URL"),
+		Model:   os.Getenv("OPENAI_MODEL_NAME"),
+	})
+	if err != nil {
+		log.Fatalf("NewEino err: %+v", err)
+		return
+	}
+	ts := text2sql.NewText2sql(cfg, newEino)
+	sql, result, err := ts.Pretty(question)
 	if err != nil {
 		log.Fatalf("text2sql err: %+v", err)
 	}
