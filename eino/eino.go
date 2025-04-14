@@ -70,9 +70,12 @@ func (x *Eino) PrettyRes(sql, question string, runResult []map[string]interface{
 
 // 如果有sql tag 就删除
 func trimSql(sql string) string {
-	if strings.HasPrefix(sql, "```sql\n") {
-		sql = strings.TrimLeft(sql, "```sql\n")
-		sql = strings.TrimRight(sql, "\n```")
+	list := []string{"```sql", "```"}
+	for _, s := range list {
+		if strings.HasPrefix(sql, s) {
+			sql = strings.TrimLeft(sql, s)
+			sql = strings.TrimRight(sql, "```")
+		}
 	}
 	return sql
 }
