@@ -72,10 +72,11 @@ func ddl2sqlMessages(ddl, question string) ([]*schema.Message, error) {
 func choiceSqlMessages(sqls, ddl, question string) ([]*schema.Message, error) {
 	template := createTemplate()
 	data := map[string]any{
-		"role":     role,
-		"question": "Select the most suitable SQL output from the above SQL statements",
-		"ddl":      ddl,
-		"limit":    limit,
+		"role": role,
+		"question": "Select the most suitable SQL output from the above SQL statements." +
+			"The returned content can only contain SQL statements, without explanations or other information, and should not be labeled with SQL tags.",
+		"ddl":   ddl,
+		"limit": limit,
 		"chat_history": []*schema.Message{
 			schema.UserMessage(question),
 			schema.AssistantMessage(sqls, nil),
